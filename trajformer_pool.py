@@ -191,6 +191,15 @@ class CPE(nn.Module):
                             self.kernel_size, self.groups)
         attn = attn.permute(
             0, 2, 1).unsqueeze(2)  # bn, groups, 1, k
+        
+        k = F.unfold(x, (self.kernel_size, 1), 1, ((self.kernel_size-1)//2, 0),
+                     self.stride).reshape(b, c, self.kernel_size, -1)  # b, c, k, n
+
+        k = k.permute(0, 3, 2, 1).reshape(-1, self.kernel_size, c)  # bn, k, c
+        kv = self.kv_func(k).reshape(b*t*w, self.kernel_size, 2,
+                                     self.num_heads, c // self.num_heads).permute(2, 0, 3, 1, 4)
+        k, v = kv[0], kv[1]  # bn, groups, k, c'  
+        # P.S. we find using key doesn't improve performance thus ignore it in the following computations
 
         attn = attn.softmax(dim=-1)
         attn = self.attn_drop(attn)
